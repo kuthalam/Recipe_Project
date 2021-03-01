@@ -8,69 +8,136 @@ import nltk
 
 class Transformer:
     recipeData = None
-    ingPredicates = list()
-    instPredicates = list()
+
+    ingPredicates = dict()
+    instPredicates = dict()
+
+    transformedIng = dict()
+    transformedInst = dict()
+
+    finalIng = list()
+    finalInst = list()
+
     nlp = spacy.load("en_core_web_sm")
+
+    replacementGuide = {"vegProtein": ["tofu"],
+                    "meatProtein": ["beef", "chicken", "pork", "pepperoni", "sausage", "turkey",
+                    "steak", "fish", "salmon", "shrimp", "lobster", "salami", "rennet"],
+                    "egg": ["veganEgg"], # Special case
+                    "veganEgg": ["egg"], # Special case v2
+                    "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
+                    "healthy": ["chicken", "turkey", "coconut oil"],
+                    "unhealthy": ["steak", "beef", "sausage", "oil"]}
+    allFoods = set()
 
     def __init__(self, url):
         request = openSession(url)
         self.recipeData = formulateJSON(request)
 
-    def ingParse(self):
+        # Also initialize allFoods since it is used later on
+        for key in self.replacementGuide.keys():
+            for food in self.replacementGuide[key]:
+                self.allFoods.add(food)
+
+    def _ingParse(self):
         for ing in self.recipeData["ingredients"]:
             parsedText = self.nlp(ing)
             for token in parsedText: # Construct the appropriate predicates
                 if token.dep_ == "ROOT": # Now we can traverse the parse tree
-                    self.ingPredicates.append("(isa " + token.text + " ingredient)")
-                    ing = ing.replace(token.text, "_") # Save a "cleaned" version of the sentence
+                    self.ingPredicates[token.text] = dict()
+                    self.ingPredicates[token.text]["isa"] = token.text
+                    ing = ing.replace(token.text, "isa") # Save a "cleaned" version of the sentence
                     for child in token.children: # For each of its children
                         if any([x.text.isdigit() for x in child.children]): # Now we have an amount and measurement
                             for item in child.children:
                                 if item.text.isdigit():
-                                    self.ingPredicates.append("(quantity " + token.text + " " + item.text + ")")
-                                    self.ingPredicates.append("(measurement " + token.text + " " + child.text + ")")
-                                    ing = ing.replace(item.text, "_") # For later use
-                                    ing = ing.replace(child.text, "_") # For later use
-                    self.ingPredicates.append("(sentence " + token.text + " " + ing + ")")
+                                    self.ingPredicates[token.text]["quantity"] = item.text
+                                    self.ingPredicates[token.text]["measurement"] = child.text
+                                    ing = ing.replace(item.text, "quantity") # For later use
+                                    ing = ing.replace(child.text, "measurement") # For later use
+                    self.ingPredicates[token.text]["sentence"] = ing
 
-    def instParse(self):
+    def _instParse(self):
         for inst in self.recipeData["instructions"]:
             parsedText = self.nlp(inst)
             for token in parsedText:
                 if token.dep_ == "ROOT":
-                    self.instPredicates.append("(isa " + token.text + " primaryMethod)")
-                    inst = inst.replace(token.text, "_")
+                    self.instPredicates[token.text] = dict()
+                    self.instPredicates[token.text]["primaryMethod"] = token.text
+                    inst = inst.replace(token.text, "primaryMethod")
                     for child in token.children:
-                        if len(child.text) > 1 and not child.is_stop: # Make sure you're getting an actual tool.
-                            self.instPredicates.append("(toolFor " + token.text + " " + child.text + ")")
-                            inst = inst.replace(child.text, "_")
-                    self.instPredicates.append("(sentence " + token.text + " " + inst + ")")
+                        if len(child.text) > 1 and not child.is_stop and not (child.text in self.allFoods): # Try to verify this is an actual tool
+                            self.instPredicates[token.text]["toolFor"] = child.text
+                            inst = inst.replace(child.text, "toolFor")
+                    self.instPredicates[token.text]["sentence"] = inst
 
-    def prettyPrintIng(self):
-        print("Ingredient propositions:")
-        for ing in self.ingPredicates:
-            if "isa" in ing: # We've encountered a new ingredient
-                print()
-                print("For " + re.findall("\w+", ing.replace("isa ", ""))[0] + ":")
+    def _decideTransformation(self):
+        print("\nSo we are going to be transforming " + self.recipeData["recipeName"] + " to a vegetarian dish.")
+
+    def _ingTransformation(self):
+        for ing in self.ingPredicates.keys():
+            allRelevantPred = self.ingPredicates[ing]
+            finalSent = allRelevantPred["sentence"]
+            if allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
+                finalSent = finalSent.replace("isa", self.replacementGuide["vegProtein"][0])
+                self.transformedIng[allRelevantPred["isa"]] = self.replacementGuide["vegProtein"][0] # Keep track of the transformed ingredients
+            else:
+                finalSent = finalSent.replace("isa", allRelevantPred["isa"])
+            if "quantity" in allRelevantPred.keys():
+                finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
+            if "measurement" in allRelevantPred.keys():
+                finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
+            self.finalIng.append(finalSent)
+
+    def _instTransformation(self):
+        for inst in self.instPredicates.keys():
+            origInst = self.instPredicates[inst]["sentence"] # This is the sentence that goes through the cascade of transformations
+            newInst = None
+
+            # First replace the ingredient if needed
+            for oldIng in self.transformedIng:
+                if oldIng in self.instPredicates[inst]["sentence"]:
+                    newInst = origInst.replace(oldIng, self.transformedIng[oldIng])
+                    self.transformedInst[self.instPredicates[inst]["sentence"]] = newInst # "Backpointer" of sorts
+
+            # Now substitute the primary method
+            if newInst is None:
+                newInst = origInst.replace("primaryMethod", self.instPredicates[inst]["primaryMethod"])
+            else:
+                newInst = newInst.replace("primaryMethod", self.instPredicates[inst]["primaryMethod"])
+
+            # Substituting the tool used is even easier now, since newInst will never be None
+            if "toolFor" in self.instPredicates[inst].keys():
+                newInst = newInst.replace("toolFor", self.instPredicates[inst]["toolFor"])
+
+            # Time to collect the new instruction
+            self.finalInst.append(newInst)
+
+    def _printNewIngredients(self):
+        print("\nYour new ingredients are: ")
+        for ing in self.finalIng:
             print(ing)
 
-    def prettyPrintInst(self):
-        print("Instruction propositions:")
-        for inst in self.instPredicates:
-            if "isa" in inst: # We've encountered a new instruction
-                print()
-                print("For " + re.findall("\w+", inst.replace("isa ", ""))[0] + ":")
-            print(inst)
+    def _printNewInstructions(self):
+        print("\nYour new instructions are: ")
+        for i in range(len(self.finalInst)):
+            print(str(i) + ". " + self.finalInst[i])
 
-    def transformPrep(self):
-        newTransformer.ingParse()
-        newTransformer.instParse()
+    def transform(self):
+        # First build the data structures
+        newTransformer._ingParse()
+        newTransformer._instParse()
+
+        # Now we alert the user to what they decided to do
+        self._decideTransformation()
+
+        self._ingTransformation()
+        self._instTransformation()
+
+        self._printNewIngredients()
+        self._printNewInstructions()
 
 if __name__ == "__main__":
     # Example command: python recipeTransformer.py https://www.allrecipes.com/recipe/21242/pizza-pasta/
     newTransformer = Transformer(sys.argv[1])
-    newTransformer.transformPrep()
-
-    # Pretty print the internal data structures
-    newTransformer.prettyPrintIng()
-    newTransformer.prettyPrintInst()
+    newTransformer.transform()
