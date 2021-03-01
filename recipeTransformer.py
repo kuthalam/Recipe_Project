@@ -30,6 +30,11 @@ class Transformer:
                     "unhealthy": ["steak", "beef", "sausage", "oil"]}
     allFoods = set()
 
+    userPrompt = """Hello! Welcome to the recipe transformer. We noticed you've given us a dish already. What would you like us to transform it into?\n\nPlease enter one of the options below:
+    - \"to vegetarian\" or \"from vegetarian\"
+    - \"to healthy\" or \"from healthy\"
+    - \"to <insert cuisine here>\"\nEnter choice here: """
+
     def __init__(self, url):
         request = openSession(url)
         self.recipeData = formulateJSON(request)
@@ -72,6 +77,8 @@ class Transformer:
                     self.instPredicates[token.text]["sentence"] = inst
 
     def _decideTransformation(self):
+        self.transformationType = input(self.userPrompt)
+
         print("\nSo we are going to be transforming " + self.recipeData["recipeName"] + " to a vegetarian dish.")
 
     def _ingTransformation(self):
