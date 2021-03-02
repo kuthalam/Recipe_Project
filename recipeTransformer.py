@@ -5,6 +5,7 @@ import spacy
 import sys
 import re
 import nltk
+import requests
 
 class Transformer:
     recipeData = None
@@ -70,10 +71,12 @@ class Transformer:
                     self.instPredicates[token.text] = dict()
                     self.instPredicates[token.text]["primaryMethod"] = token.text
                     inst = inst.replace(token.text, "primaryMethod")
-                    for child in token.children:
-                        if len(child.text) > 1 and not child.is_stop and not (child.text in self.allFoods): # Try to verify this is an actual tool
-                            self.instPredicates[token.text]["toolFor"] = child.text
-                            inst = inst.replace(child.text, "toolFor")
+                    for child in token.children: # Now we start relying on ConceptNet to check if any of these children are cooking tools
+                        requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text).json()
+                        for edge in requestObj["edges"]:
+                            if "usedfor" in edge["@id"].lower() and edge["end"]["label"].lower() == "cook":
+                                self.instPredicates[token.text]["toolFor"] = child.text
+                                inst = inst.replace(child.text, "toolFor")
                     self.instPredicates[token.text]["sentence"] = inst
 
     def _decideTransformation(self):
