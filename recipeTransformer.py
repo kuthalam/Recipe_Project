@@ -124,7 +124,8 @@ class Transformer:
                 if allRelevantPred["isa"] in self.replacementGuide["unhealthy"] and allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
                     finalSent = finalSent.replace("isa", "chicken")
                     self.transformedIng[allRelevantPred["isa"]] = "chicken" # Keep track of the transformed ingredients
-                elif allRelevantPred["isa"] in self.replacementGuide["unhealthy"] and not allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
+                elif (allRelevantPred["isa"] in self.replacementGuide["unhealthy"] or allRelevantPred["isa"].split(" ")[-1] in self.replacementGuide["unhealthy"]) \
+                and not allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
                     finalSent = finalSent.replace("isa", "coconut oil")
                     self.transformedIng[allRelevantPred["isa"]] = "coconut oil" # Keep track of the transformed ingredients
                 else:
