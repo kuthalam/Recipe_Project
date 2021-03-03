@@ -28,7 +28,7 @@ class Transformer:
                     "veganEgg": ["egg"], # Special case v2
                     "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
                     "healthy": ["chicken", "turkey", "coconut oil"],
-                    "unhealthy": ["steak", "beef", "sausage", "oil"]}
+                    "unhealthy": ["steak", "beef", "sausage", "oil", "butter"]}
     allFoods = set()
 
     userPrompt = """Hello! Welcome to the recipe transformer. We noticed you've given us a dish already. What would you like us to transform it into?\n\nPlease enter one of the options below:
@@ -36,11 +36,21 @@ class Transformer:
     - \"to healthy\" or \"from healthy\"
     - \"to <insert cuisine here>\"\nEnter choice here: """
 
+    transformationType = None
+
+    ############################################################################
+    # Name: __init__                                                           #
+    # Params: url (the url from which a recipe is fetched)                     #
+    # Returns: None                                                            #
+    # Notes: Makes a HTTP request to get the right information about the       #
+    # recipe                                                                   #
+    # and format it into a JSON. Also constructs a set of foods we know about  #
+    # for later convenience.                                                   #
+    ############################################################################
     def __init__(self, url):
         request = openSession(url)
         self.recipeData = formulateJSON(request)
 
-        # Also initialize allFoods since it is used later on
         for key in self.replacementGuide.keys():
             for food in self.replacementGuide[key]:
                 self.allFoods.add(food)
@@ -53,8 +63,16 @@ class Transformer:
                     self.ingPredicates[token.text] = dict()
                     self.ingPredicates[token.text]["isa"] = token.text
                     ing = ing.replace(token.text, "isa") # Save a "cleaned" version of the sentence
-                    for child in token.children: # For each of its children
-                        if any([x.text.isdigit() for x in child.children]): # Now we have an amount and measurement
+                    for child in token.children: # Only related words are considered to be useful
+                        requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text + "_" + token.text).json()
+                        if len(requestObj["edges"]) != 0:
+                            if "end" in requestObj["edges"][0].keys():
+                                if "sense_label" in requestObj["edges"][0]["end"].keys():
+                                    if "food" in requestObj["edges"][0]["end"]["sense_label"].lower():
+                                        ing = ing.replace("isa", token.text) # Get back the original sentence
+                                        self.ingPredicates[token.text]["isa"] = child.text + " " + token.text
+                                        ing = ing.replace(child.text + " " + token.text, "isa")
+                        if any([x.text.isdigit() for x in child.children]): # The measurement and amount, tied together by the parser
                             for item in child.children:
                                 if item.text.isdigit():
                                     self.ingPredicates[token.text]["quantity"] = item.text
@@ -82,22 +100,40 @@ class Transformer:
     def _decideTransformation(self):
         self.transformationType = input(self.userPrompt)
 
-        print("\nSo we are going to be transforming " + self.recipeData["recipeName"] + " to a vegetarian dish.")
+        print("\nSo we are going to be transforming " + self.recipeData["recipeName"] + " " + self.transformationType + " dish.")
 
     def _ingTransformation(self):
-        for ing in self.ingPredicates.keys():
-            allRelevantPred = self.ingPredicates[ing]
-            finalSent = allRelevantPred["sentence"]
-            if allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
-                finalSent = finalSent.replace("isa", self.replacementGuide["vegProtein"][0])
-                self.transformedIng[allRelevantPred["isa"]] = self.replacementGuide["vegProtein"][0] # Keep track of the transformed ingredients
-            else:
-                finalSent = finalSent.replace("isa", allRelevantPred["isa"])
-            if "quantity" in allRelevantPred.keys():
-                finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
-            if "measurement" in allRelevantPred.keys():
-                finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
-            self.finalIng.append(finalSent)
+        if self.transformationType == "to vegetarian":
+            for ing in self.ingPredicates.keys():
+                allRelevantPred = self.ingPredicates[ing]
+                finalSent = allRelevantPred["sentence"]
+                if allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
+                    finalSent = finalSent.replace("isa", self.replacementGuide["vegProtein"][0])
+                    self.transformedIng[allRelevantPred["isa"]] = self.replacementGuide["vegProtein"][0] # Keep track of the transformed ingredients
+                else:
+                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
+                if "quantity" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
+                if "measurement" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
+                self.finalIng.append(finalSent)
+        elif self.transformationType == "to healthy":
+            for ing in self.ingPredicates.keys():
+                allRelevantPred = self.ingPredicates[ing]
+                finalSent = allRelevantPred["sentence"]
+                if allRelevantPred["isa"] in self.replacementGuide["unhealthy"] and allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
+                    finalSent = finalSent.replace("isa", "chicken")
+                    self.transformedIng[allRelevantPred["isa"]] = "chicken" # Keep track of the transformed ingredients
+                elif allRelevantPred["isa"] in self.replacementGuide["unhealthy"] and not allRelevantPred["isa"] in self.replacementGuide["meatProtein"]:
+                    finalSent = finalSent.replace("isa", "coconut oil")
+                    self.transformedIng[allRelevantPred["isa"]] = "coconut oil" # Keep track of the transformed ingredients
+                else:
+                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
+                if "quantity" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
+                if "measurement" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
+                self.finalIng.append(finalSent)
 
     def _instTransformation(self):
         for inst in self.instPredicates.keys():
