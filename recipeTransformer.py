@@ -361,7 +361,6 @@ class Transformer:
         self._printNewInstructions()
 
 if __name__ == "__main__":
-    # Example command: python recipeTransformer.py https://www.allrecipes.com/recipe/21242/pizza-pasta/
     userRecipeURL = input("\nHello and welcome to the recipe transformer! Please enter an AllRecipes URL that gives us a recipe to transform: ")
     newTransformer = Transformer(userRecipeURL.strip())
     print("\nThank you! We will be asking for more input momentarily, so please wait as we get everything ready (this could take a while).")
