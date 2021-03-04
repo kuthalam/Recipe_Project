@@ -6,5 +6,6 @@ recipeURLs = [
 "https://www.allrecipes.com/recipe/15181/famous-chicken-francaise/",
 "https://www.allrecipes.com/recipe/232279/one-pot-thai-style-rice-noodles/",
 "https://www.allrecipes.com/recipe/255462/lasagna-flatbread/",
-"https://www.allrecipes.com/recipe/21242/pizza-pasta/"
+"https://www.allrecipes.com/recipe/21242/pizza-pasta/",
+"https://www.allrecipes.com/recipe/223042/chicken-parmesan/?internalSource=hub%20recipe&referringContentType=Search"
 ]
