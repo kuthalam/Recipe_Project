@@ -31,7 +31,8 @@ class Transformer:
                     "healthy": ["chicken", "turkey", "coconut oil", "poultry", "fish"], # This list was constructed by referring to https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/nutrition-basics/meat-poultry-and-fish-picking-healthy-proteins
                     "unhealthy": ["steak", "beef", "sausage", "butter", "ham", "salami"],
                     "spices": ["seasoning", "oregano"],
-                    "condiments": ["salt"]}
+                    "condiments": ["salt", "oil"],
+                    "plants": ["onions", "onion"]}
     allFoods = set()
     cookingVerbs = ["place"] # ConceptNet can be very bad at detecting what things are verbs
 
@@ -80,7 +81,6 @@ class Transformer:
                     additionalRoot = True
 
                     # Now let's check if the root word is actually food
-                    rootRequest = requests.get("http://api.conceptnet.io/c/en/" + token.text.lower() + "?offset=0&limit=" + str(self.queryOffset)).json()
                     if self._isAFood(token.text.lower()):
                         mainToken = token.text
                     else: # If this fails, check every word in the sentence for food
@@ -89,29 +89,32 @@ class Transformer:
                                 mainToken = newToken.text
                                 break # No need to keep going if we've got a food, as what came before the first food term was likely adjectives
 
-                    # Now assign values based on the ingredient name
-                    if not mainToken is None:
-                        dictKey = mainToken + " " + str(i) # This is the key with which all info for this ingredient can be retrieved
-                        self.ingPredicates[dictKey] = dict()
-                        self.ingPredicates[dictKey]["isa"] = mainToken
-                        ing = ing.replace(mainToken, "isa") # Save a "cleaned" version of the sentence
-                        for child in token.children: # Only related words are considered to be useful
-                            requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text + "_" + mainToken + "?offset=0&limit=" + str(self.queryOffset)).json()
+                    # Sometimes, you get None for odd reasons. Seems better to go with what we have rather than adding an obscure layer of parsing
+                    if mainToken is None:
+                        mainToken = token.text
 
-                            for edge in requestObj["edges"]: # Check if there are two word phrases like ground beef, so we can make a note of the entire phrase
-                                eachEdge = edge["@id"].split(",") # Look for child.text + " " + token.text isa food
-                                if "isa" in eachEdge[0].lower() and "/" + token.text.lower() + "/" in eachEdge[1].lower() and "food" in eachEdge[2].lower():
-                                    ing = ing.replace("isa", mainToken) # Get back the original sentence
-                                    self.ingPredicates[dictKey]["isa"] = child.text + " " + mainToken
-                                    ing = ing.replace(child.text + " " + mainToken, "isa")
-                            if any([x.text.isdigit() for x in child.children]): # The measurement and amount, tied together by the parser
-                                for item in child.children:
-                                    if item.text.isdigit():
-                                        self.ingPredicates[dictKey]["quantity"] = item.text
-                                        self.ingPredicates[dictKey]["measurement"] = child.text
-                                        ing = ing.replace(item.text, "quantity") # For later use
-                                        ing = ing.replace(child.text, "measurement") # For later use
-                        self.ingPredicates[dictKey]["sentence"] = ing
+                    # Now assign values based on the ingredient name
+                    dictKey = mainToken + " " + str(i) # This is the key with which all info for this ingredient can be retrieved
+                    self.ingPredicates[dictKey] = dict()
+                    self.ingPredicates[dictKey]["isa"] = mainToken
+                    ing = ing.replace(mainToken, "isa") # Save a "cleaned" version of the sentence
+                    for child in token.children: # Only related words are considered to be useful
+                        requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text + "_" + mainToken + "?offset=0&limit=" + str(self.queryOffset)).json()
+
+                        for edge in requestObj["edges"]: # Check if there are two word phrases like ground beef, so we can make a note of the entire phrase
+                            eachEdge = edge["@id"].split(",") # Look for child.text + " " + token.text isa food
+                            if "isa" in eachEdge[0].lower() and "/" + token.text.lower() + "/" in eachEdge[1].lower() and "food" in eachEdge[2].lower():
+                                ing = ing.replace("isa", mainToken) # Get back the original sentence
+                                self.ingPredicates[dictKey]["isa"] = child.text + " " + mainToken
+                                ing = ing.replace(child.text + " " + mainToken, "isa")
+                        if any([x.text.isdigit() for x in child.children]): # The measurement and amount, tied together by the parser
+                            for item in child.children:
+                                if item.text.isdigit():
+                                    self.ingPredicates[dictKey]["quantity"] = item.text
+                                    self.ingPredicates[dictKey]["measurement"] = child.text
+                                    ing = ing.replace(item.text, "quantity") # For later use
+                                    ing = ing.replace(child.text, "measurement") # For later use
+                    self.ingPredicates[dictKey]["sentence"] = ing
 
     ############################################################################
     # Name: _isAFood                                                           #
@@ -160,17 +163,21 @@ class Transformer:
                             if self._isAnAction(newToken.text) and mainToken is None:
                                 mainToken = newToken.text
 
-                    if not mainToken is None:
-                        self.instPredicates[mainToken + str(i)] = dict()
-                        self.instPredicates[mainToken + str(i)]["primaryMethod"] = mainToken
-                        inst = inst.replace(mainToken, "primaryMethod")
-                        for child in token.children: # Now we start relying on ConceptNet to check if any of these children are cooking tools
-                            requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text + "?offset=0&limit=" + str(self.queryOffset)).json()
-                            for edge in requestObj["edges"]:
-                                if "usedfor" in edge["@id"].lower() and edge["end"]["label"].lower() == "cook":
-                                    self.instPredicates[mainToken + str(i)]["toolFor"] = child.text
-                                    inst = inst.replace(child.text, "toolFor")
-                        self.instPredicates[mainToken + str(i)]["sentence"] = inst
+                    # Sometimes, you get None for odd reasons. Seems better to go with what we have rather than adding an obscure layer of parsing
+                    if mainToken is None:
+                        mainToken = token.text
+
+                    # Now we can assign the primary method and get a cooking tool for it
+                    self.instPredicates[mainToken + str(i)] = dict()
+                    self.instPredicates[mainToken + str(i)]["primaryMethod"] = mainToken
+                    inst = inst.replace(mainToken, "primaryMethod")
+                    for child in token.children: # Now we start relying on ConceptNet to check if any of these children are cooking tools
+                        requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text + "?offset=0&limit=" + str(self.queryOffset)).json()
+                        for edge in requestObj["edges"]:
+                            if "usedfor" in edge["@id"].lower() and edge["end"]["label"].lower() == "cook":
+                                self.instPredicates[mainToken + str(i)]["toolFor"] = child.text
+                                inst = inst.replace(child.text, "toolFor")
+                    self.instPredicates[mainToken + str(i)]["sentence"] = inst
 
     ############################################################################
     # Name: _isAnAction                                                        #
@@ -241,8 +248,10 @@ class Transformer:
                 finalSent = allRelevantPred["sentence"]
                 if any([item in self.replacementGuide["unhealthy"] for item in allRelevantPred["isa"].split(" ")]) and \
                 any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # Found an unhealthy meat protein
-                    finalSent = finalSent.replace("isa", "chicken")
-                    self.transformedIng[allRelevantPred["isa"]] = "chicken" # Keep track of the transformed ingredients
+                    meatReplacementOptions = list(set(self.replacementGuide["meatProtein"]).intersection(set(self.replacementGuide["healthy"])))
+                    replaceWith = meatReplacementOptions[random.randrange(len(meatReplacementOptions))] # Make a random healthy meat the replacement
+                    finalSent = finalSent.replace("isa", replaceWith)
+                    self.transformedIng[allRelevantPred["isa"]] = replaceWith # Keep track of the transformed ingredients
                 elif any([item in self.replacementGuide["unhealthy"] for item in allRelevantPred["isa"].split(" ")]) and \
                 not any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # Found an unhealthy non-meat protein (butter for us)
                     finalSent = finalSent.replace("isa", "coconut oil")
