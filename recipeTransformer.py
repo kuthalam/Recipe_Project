@@ -24,12 +24,13 @@ class Transformer:
 
     replacementGuide = {"vegProtein": ["tofu"],
                     "meatProtein": ["beef", "chicken", "pork", "pepperoni", "sausage", "turkey",
-                    "steak", "fish", "salmon", "shrimp", "lobster", "salami", "rennet", "poultry"],
+                    "steak", "fish", "salmon", "shrimp", "lobster", "salami", "rennet", "poultry",
+                    "bacon"],
                     "egg": ["veganEgg"], # Special case
                     "veganEgg": ["egg"], # Special case v2
                     "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
                     "healthy": ["chicken", "turkey", "coconut oil", "poultry", "fish"], # This list was constructed by referring to https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/nutrition-basics/meat-poultry-and-fish-picking-healthy-proteins
-                    "unhealthy": ["steak", "beef", "sausage", "butter", "ham", "salami"],
+                    "unhealthy": ["steak", "beef", "sausage", "butter", "ham", "salami", "bacon"],
                     "spices": ["seasoning", "oregano"],
                     "condiments": ["salt", "oil"],
                     "plants": ["onions", "onion"]}
@@ -277,6 +278,7 @@ class Transformer:
                 elif any([item in self.replacementGuide["healthy"] for item in allRelevantPred["isa"].split(" ")]) and \
                 not any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # Found a healthy non-meat? (No use for now)
                     print("No non-meat unhealthy substitutes.") # This is just a placeholder for potential future work
+                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
                 else: # This is not an ingredient that we need to replace for health reasons
                     finalSent = finalSent.replace("isa", allRelevantPred["isa"])
                 if "quantity" in allRelevantPred.keys():
@@ -284,6 +286,22 @@ class Transformer:
                 if "measurement" in allRelevantPred.keys():
                     finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
                 self.finalIng.append(finalSent)
+
+        elif self.transformationType == "from vegetarian":
+            for ing in self.ingPredicates.keys():
+                allRelevantPred = self.ingPredicates[ing]
+                finalSent = allRelevantPred["sentence"]
+                if any([item == "tofu" for item in allRelevantPred["isa"].split(" ")]): # If tofu ever shows up, replace it with a meat protein
+                    finalSent = finalSent.replace("isa", "chicken") # Chicken works for pretty much anywhere tofu would show up
+                    self.transformedIng[allRelevantPred["isa"]] = "chicken" # Keep track of the transformed ingredients
+                else: # This is not an ingredient that we need to add meat to
+                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
+                if "quantity" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
+                if "measurement" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
+                self.finalIng.append(finalSent)
+
         else: # Placeholder for now
             print("\nValid option - we just haven't gotten to it yet. Sorry!")
             sys.exit(0)
@@ -294,36 +312,32 @@ class Transformer:
     # Returns: None                                                            #
     # Notes: Using the transformed ingredients from before                     #
     # (self.transformedIng), we transform the ingredients into their           #
-    # appropriate versions.                                                    #
+    # appropriate versions within the instructions.                            #
     ############################################################################
     def _instTransformation(self):
         for inst in self.instPredicates.keys():
-            origInst = self.instPredicates[inst]["sentence"] # This is the sentence that goes through the cascade of transformations
-            newInst = None
+            finalInst = self.instPredicates[inst]["sentence"] # This is the sentence that goes through the cascade of transformations
 
             # First replace the ingredient if needed
             for oldIng in self.transformedIng:
-                if oldIng in origInst or any([x in origInst for x in oldIng.split(" ")]):
+                if oldIng in finalInst or any([x in finalInst for x in oldIng.split(" ")]):
                     if len(oldIng) > 1: # If the "any" part of the above clause was what caused the condition to trigger
                         # Then we need to iterate over those values to make sure everything in the old instruction is properly replaced
                         for ing in oldIng.split(" "):
-                            newInst = origInst.replace(ing, self.transformedIng[oldIng])
+                            finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
                     else:
-                        newInst = origInst.replace(ing, self.transformedIng[oldIng])
-                    self.transformedInst[origInst] = newInst # "Backpointer" of sorts
+                        finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
+                    self.transformedInst[finalInst] = finalInst # "Backpointer" of sorts
 
             # Now substitute the primary method
-            if newInst is None:
-                newInst = origInst.replace("primaryMethod", self.instPredicates[inst]["primaryMethod"])
-            else:
-                newInst = newInst.replace("primaryMethod", self.instPredicates[inst]["primaryMethod"])
+            finalInst = finalInst.replace("primaryMethod", self.instPredicates[inst]["primaryMethod"])
 
-            # Substituting the tool used is even easier now, since newInst will never be None
+            # Substituting the tool used, though we need to make sure it was found first
             if "toolFor" in self.instPredicates[inst].keys():
-                newInst = newInst.replace("toolFor", self.instPredicates[inst]["toolFor"])
+                finalInst = finalInst.replace("toolFor", self.instPredicates[inst]["toolFor"])
 
             # Time to collect the new instruction
-            self.finalInst.append(newInst)
+            self.finalInst.append(finalInst)
 
     ############################################################################
     # Name: _printNewIngredients                                               #

@@ -14,7 +14,8 @@ Currently, you can do everything with this command: `python recipeTransformer.py
         - Thus, just about any source of meat gets transformed to tofu while the general procedure stays the same.
         - The output instructions may seem a little strange at first, but generally the cooking instructions for meat stay consistent with tofu.
     - From vegetarian:
-        - TODO
+        - Only works if we are replacing a protein in the dish (tofu).
+        - Otherwise, there is not really a way to make a dish non-vegetarian if it does not already include meat (e.g. desserts).
     - To healthy:
         - By healthy, we mainly look to sources of protein and fat. Butter and red meat like beef are examples
         - Coconut oil is generally a good source of replacement for butter, so we go with that
