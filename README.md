@@ -1,6 +1,6 @@
 # Recipe_Project
 
-Currently, you can do everything with this command: `python recipeTransformer.py <recipeURL>`.
+Currently, you can do everything with this command: `python recipeTransformer.py`.
 
 * Example command: `python recipeTransformer.py`
 * The CLI should hopefully be able to guide the user from there.
