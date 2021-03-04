@@ -19,6 +19,7 @@ Currently, you can do everything with this command: `python recipeTransformer.py
         - By healthy, we mainly look to sources of protein and fat. Butter and red meat like beef are examples
         - Coconut oil is generally a good source of replacement for butter, so we go with that
         - In addition, the red meats get replaced with healthier alternatives (like chicken and turkey)
+        - The replacement is random too, for variety. That is, if the input has an unhealthy meat, a random healthy meat is picked as the replacement.
     - From healthy:
         - Basically like the above “to healthy”, but replace the healthy meats with less healthy alternatives
     - To Mexican:
