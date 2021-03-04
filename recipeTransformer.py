@@ -28,7 +28,7 @@ class Transformer:
                     "egg": ["veganEgg"], # Special case
                     "veganEgg": ["egg"], # Special case v2
                     "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
-                    "healthy": ["chicken", "turkey", "coconut oil", "poultry", "fish"], # This list was constructed while referring to https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/nutrition-basics/meat-poultry-and-fish-picking-healthy-proteins
+                    "healthy": ["chicken", "turkey", "coconut oil", "poultry", "fish"], # This list was constructed by referring to https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/nutrition-basics/meat-poultry-and-fish-picking-healthy-proteins
                     "unhealthy": ["steak", "beef", "sausage", "butter", "ham", "salami"],
                     "spices": ["seasoning", "oregano"],
                     "condiments": ["salt"]}
@@ -73,9 +73,11 @@ class Transformer:
         for i in range(len(self.recipeData["ingredients"])): # So we can distinguish between different ingredients with the same root
             ing = self.recipeData["ingredients"][i]
             parsedText = self.nlp(ing)
+            additionalRoot = False # Turns true if the potential for a second root word pops up; semaphore to avoid storing that root word
             mainToken = None # The actual ingredient name
             for token in parsedText: # Construct the appropriate predicates
-                if token.dep_ == "ROOT": # Now we can traverse the parse tree
+                if token.dep_ == "ROOT" and not additionalRoot: # Now we can traverse the parse tree
+                    additionalRoot = True
 
                     # Now let's check if the root word is actually food
                     rootRequest = requests.get("http://api.conceptnet.io/c/en/" + token.text.lower() + "?offset=0&limit=" + str(self.queryOffset)).json()
