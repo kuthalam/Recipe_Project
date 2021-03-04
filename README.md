@@ -10,7 +10,7 @@ Currently, you can do everything with this command: `python recipeTransformer.py
 - The following gives some general details as the kind of ways we tried making transformations:
     - To vegetarian:
         - We feel that there are many subtleties to think about like “do we consider whether vegetarians eat eggs or not?”, etc.
-        - However, to avoid coming up with some really strange recipe results (transformed scrambled eggs, for example), we simply chose to replace the main source of protein.
+        - To avoid coming up with some really strange recipe results (transformed scrambled eggs, for example), we simply chose to replace the main source of protein.
         - Thus, just about any source of meat gets transformed to tofu while the general procedure stays the same.
         - The output instructions may seem a little strange at first, but generally the cooking instructions for meat stay consistent with tofu.
     - From vegetarian:
