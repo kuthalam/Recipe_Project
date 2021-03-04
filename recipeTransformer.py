@@ -29,7 +29,8 @@ class Transformer:
                     "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
                     "healthy": ["chicken", "turkey", "coconut oil"],
                     "unhealthy": ["steak", "beef", "sausage", "butter"],
-                    "spices": ["seasoning"]}
+                    "spices": ["seasoning", "oregano"],
+                    "condiments": ["salt"]}
     allFoods = set()
 
     userPrompt = """Hello! Welcome to the recipe transformer. We noticed you've given us a dish already. What would you like us to transform it into?\n\nPlease enter one of the options below:
@@ -70,13 +71,9 @@ class Transformer:
                         mainToken = token.text
                     elif mainToken == None: # No need to keep going if we've got a food, as what came before the first food term was likely adjectives
                         for edge in rootRequest["edges"]:
-                            if "end" in edge.keys():
-                                if "sense_label" in edge["end"].keys():
-                                    if "food" in edge["end"]["sense_label"].lower() and "/" + token.text + "/" in edge["end"]["@id"]:
-                                        mainToken = token.text
-                                elif "label" in edge["end"].keys() and "/" + token.text + "/" in edge["end"]["@id"]:
-                                    if "food" in edge["end"]["label"].lower():
-                                        mainToken = token.text
+                            isaEdge = edge["@id"].split(",") # Look for token.text isa food
+                            if "isa" in isaEdge[0].lower() and "/" + token.text.lower() + "/" in isaEdge[1].lower() and "food" in isaEdge[2].lower():
+                                mainToken = token.text
                     if mainToken == None: # If this fails, check every word in the sentence for food
                         for newToken in parsedText:
                             newRequest = requests.get("http://api.conceptnet.io/c/en/" + newToken.text + "?offset=0&limit=" + str(self.queryOffset)).json()
@@ -84,13 +81,9 @@ class Transformer:
                                 mainToken = newToken.text
                             elif mainToken == None: # No need to keep going if we've got a food, as what came before the first food term was likely adjectives
                                 for edge in newRequest["edges"]:
-                                    if "end" in edge.keys():
-                                        if "sense_label" in edge["end"].keys() and "/" + newToken.text + "/" in edge["end"]["@id"]:
-                                            if "food" in edge["end"]["sense_label"].lower():
-                                                mainToken = newToken.text
-                                        elif "label" in edge["end"].keys() and "/" + newToken.text + "/" in edge["end"]["@id"]:
-                                            if "food" in edge["end"]["label"].lower():
-                                                mainToken = newToken.text
+                                    isaEdge = edge["@id"].split(",") # Look for token.text isa food
+                                    if "isa" in isaEdge[0].lower() and "/" + newToken.text.lower() + "/" in isaEdge[1].lower() and "food" in isaEdge[2].lower():
+                                        mainToken = newToken.text
 
                     # Now assign values based on the ingredient name
                     if not mainToken is None:
@@ -214,7 +207,7 @@ class Transformer:
     def _printNewInstructions(self):
         print("\nYour new instructions are: ")
         for i in range(len(self.finalInst)):
-            print(str(i) + ". " + self.finalInst[i])
+            print(str(i + 1) + ". " + self.finalInst[i])
 
     def transform(self):
         # First build the data structures
