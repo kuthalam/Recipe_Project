@@ -15,7 +15,6 @@ class Transformer:
     instPredicates = dict()
 
     transformedIng = dict()
-    transformedInst = dict()
 
     finalIng = list()
     finalInst = list()
@@ -25,12 +24,13 @@ class Transformer:
     replacementGuide = {"vegProtein": ["tofu"],
                     "meatProtein": ["beef", "chicken", "pork", "pepperoni", "sausage", "turkey",
                     "steak", "fish", "salmon", "shrimp", "lobster", "salami", "rennet", "poultry",
-                    "bacon"],
+                    "bacon", "sirloin", "lamb"],
+                    "meatLiquids": ["stock", "broth"],
                     "egg": ["veganEgg"], # Special case
                     "veganEgg": ["egg"], # Special case v2
                     "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
                     "healthy": ["chicken", "turkey", "coconut oil", "poultry", "fish"], # This list was constructed by referring to https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/nutrition-basics/meat-poultry-and-fish-picking-healthy-proteins
-                    "unhealthy": ["steak", "beef", "sausage", "butter", "ham", "salami", "bacon"],
+                    "unhealthy": ["steak", "beef", "sausage", "butter", "ham", "salami", "bacon", "sirloin"],
                     "spices": ["seasoning", "oregano"],
                     "condiments": ["salt", "oil"],
                     "plants": ["onions", "onion"]}
@@ -90,6 +90,11 @@ class Transformer:
                                 mainToken = newToken.text
                                 break # No need to keep going if we've got a food, as what came before the first food term was likely adjectives
 
+                    # If you get beef sirloin or a kind of stock or broth,
+                    # replace both words, not just "sirloin" or "broth"
+                    if "sirloin" in mainToken or mainToken in self.replacementGuide["meatLiquids"]:
+                        mainToken = list(parsedText)[list(parsedText).index(token) - 1].text + " " + token.text
+
                     # Sometimes, you get None for odd reasons. Seems better to go with what we have rather than adding an obscure layer of parsing
                     if mainToken is None:
                         mainToken = token.text
@@ -100,11 +105,11 @@ class Transformer:
                     self.ingPredicates[dictKey]["isa"] = mainToken
                     ing = ing.replace(mainToken, "isa") # Save a "cleaned" version of the sentence
                     for child in token.children: # Only related words are considered to be useful
-                        requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text + "_" + mainToken + "?offset=0&limit=" + str(self.queryOffset)).json()
+                        requestObj = requests.get("http://api.conceptnet.io/c/en/" + child.text.lower() + "_" + mainToken.lower() + "?offset=0&limit=" + str(self.queryOffset)).json()
 
                         for edge in requestObj["edges"]: # Check if there are two word phrases like ground beef, so we can make a note of the entire phrase
                             eachEdge = edge["@id"].split(",") # Look for child.text + " " + token.text isa food
-                            if "isa" in eachEdge[0].lower() and "/" + token.text.lower() + "/" in eachEdge[1].lower() and "food" in eachEdge[2].lower():
+                            if "isa" in eachEdge[0].lower() and "/" + child.text.lower() + "_" + mainToken.lower() + "/" in eachEdge[1].lower() and "food" in eachEdge[2].lower():
                                 ing = ing.replace("isa", mainToken) # Get back the original sentence
                                 self.ingPredicates[dictKey]["isa"] = child.text + " " + mainToken
                                 ing = ing.replace(child.text + " " + mainToken, "isa")
@@ -235,6 +240,9 @@ class Transformer:
                 if any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # If you found a meat protein
                     finalSent = finalSent.replace("isa", self.replacementGuide["vegProtein"][0]) # Then tofu is pretty much the go-to replacement
                     self.transformedIng[allRelevantPred["isa"]] = self.replacementGuide["vegProtein"][0] # Keep track of the transformed ingredients
+                elif any([x in self.replacementGuide["meatLiquids"] for x in allRelevantPred["isa"].split(" ")]): # Quick substitution for the liquids
+                    finalSent = finalSent.replace("isa", "vegetable broth") # Then vegetable broth is pretty much the go-to replacement (reference: https://www.myfrugalhome.com/broth-substitutes/)
+                    self.transformedIng[allRelevantPred["isa"]] = "vegetable broth" # Keep track of the transformed ingredients
                 else: # If the ingredient's not a meat protein, there's nothing to replace
                     finalSent = finalSent.replace("isa", allRelevantPred["isa"])
                 if "quantity" in allRelevantPred.keys():
@@ -327,7 +335,10 @@ class Transformer:
                             finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
                     else:
                         finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
-                    self.transformedInst[finalInst] = finalInst # "Backpointer" of sorts
+
+            # Get rid of the word meat if we're transforming to a vegetarian recipe
+            if self.transformationType == "to vegetarian" and "meat" in finalInst:
+                finalInst = finalInst.replace("meat ", "")
 
             # Now substitute the primary method
             finalInst = finalInst.replace("primaryMethod", self.instPredicates[inst]["primaryMethod"])
