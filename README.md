@@ -13,6 +13,7 @@ Currently, you can do everything with this command: `python recipeTransformer.py
         - To avoid coming up with some really strange recipe results (transformed scrambled eggs, for example), we simply chose to replace the main source of protein.
         - Thus, just about any source of meat gets transformed to tofu while the general procedure stays the same.
         - The output instructions may seem a little strange at first, but generally the cooking instructions for meat stay consistent with tofu.
+        - Also, any meat liquids (namely stock and broth), have been replaced with "vegetable broth"
     - From vegetarian:
         - Only works if we are replacing a protein in the dish (tofu).
         - Otherwise, there is not really a way to make a dish non-vegetarian if it does not already include meat (e.g. desserts).
