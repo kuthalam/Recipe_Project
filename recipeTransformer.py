@@ -90,14 +90,15 @@ class Transformer:
                                 mainToken = newToken.text
                                 break # No need to keep going if we've got a food, as what came before the first food term was likely adjectives
 
+                    # Sometimes, you get None for odd reasons. Seems better to go with what we have rather than adding an obscure layer of parsing.
+                    # That said, there is one last check after this
+                    if mainToken is None:
+                        mainToken = token.text
+
                     # If you get beef sirloin or a kind of stock or broth,
                     # replace both words, not just "sirloin" or "broth"
                     if "sirloin" in mainToken or mainToken in self.replacementGuide["meatLiquids"]:
                         mainToken = list(parsedText)[list(parsedText).index(token) - 1].text + " " + token.text
-
-                    # Sometimes, you get None for odd reasons. Seems better to go with what we have rather than adding an obscure layer of parsing
-                    if mainToken is None:
-                        mainToken = token.text
 
                     # Now assign values based on the ingredient name
                     dictKey = mainToken + " " + str(i) # This is the key with which all info for this ingredient can be retrieved
