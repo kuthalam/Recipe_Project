@@ -7,6 +7,7 @@ import re
 import nltk
 import requests
 import random
+import string
 
 class Transformer:
     recipeData = None
@@ -241,10 +242,12 @@ class Transformer:
     # easier (this is what self.transformedIng is for).                        #
     ############################################################################
     def _ingTransformation(self):
-        if self.transformationType == "to vegetarian":
-            for ing in self.ingPredicates.keys():
-                allRelevantPred = self.ingPredicates[ing]
-                finalSent = allRelevantPred["sentence"]
+        for ing in self.ingPredicates.keys():
+            allRelevantPred = self.ingPredicates[ing]
+            finalSent = allRelevantPred["sentence"]
+
+            # Now for types of transformations
+            if self.transformationType == "to vegetarian": # The use of "any" below is due to ingredient names like "ground beef" where "beef" is the only word in our dict
                 if any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # If you found a meat protein
                     finalSent = finalSent.replace("isa", self.replacementGuide["vegProtein"][0]) # Then tofu is pretty much the go-to replacement
                     self.transformedIng[allRelevantPred["isa"]] = self.replacementGuide["vegProtein"][0] # Keep track of the transformed ingredients
@@ -255,18 +258,8 @@ class Transformer:
                     else:
                         finalSent = finalSent.replace("isa", "soy sauce") # Soy sauce seems reasonable (reference: https://food52.com/blog/24403-best-worcestershire-sauce-substitutes)
                         self.transformedIng[allRelevantPred["isa"]] = "soy sauce" # Keep track of the transformed ingredients
-                else: # If the ingredient's not a meat protein, there's nothing to replace
-                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
-                if "quantity" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
-                if "measurement" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
-                self.finalIng.append(finalSent)
 
-        elif self.transformationType == "to healthy": # The use of "any" below is due to ingredient names like "ground beef" where "beef" is the only word in our dict
-            for ing in self.ingPredicates.keys():
-                allRelevantPred = self.ingPredicates[ing]
-                finalSent = allRelevantPred["sentence"]
+            elif self.transformationType == "to healthy":
                 if any([item in self.replacementGuide["unhealthy"] for item in allRelevantPred["isa"].split(" ")]) and \
                 any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # Found an unhealthy meat protein
                     meatReplacementOptions = list(set(self.replacementGuide["meatProtein"]).intersection(set(self.replacementGuide["healthy"])))
@@ -277,18 +270,8 @@ class Transformer:
                 not any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # Found an unhealthy non-meat protein (butter for us)
                     finalSent = finalSent.replace("isa", "coconut oil")
                     self.transformedIng[allRelevantPred["isa"]] = "coconut oil" # Keep track of the transformed ingredients
-                else: # This is not an ingredient that we need to replace for health reasons
-                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
-                if "quantity" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
-                if "measurement" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
-                self.finalIng.append(finalSent)
 
-        elif self.transformationType == "from healthy":
-            for ing in self.ingPredicates.keys():
-                allRelevantPred = self.ingPredicates[ing]
-                finalSent = allRelevantPred["sentence"]
+            elif self.transformationType == "from healthy":
                 if any([item in self.replacementGuide["healthy"] for item in allRelevantPred["isa"].split(" ")]) and \
                 any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # If we found a healthy meat
                     meatReplacementOptions = list(set(self.replacementGuide["meatProtein"]).intersection(set(self.replacementGuide["unhealthy"])))
@@ -299,33 +282,13 @@ class Transformer:
                 not any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # Found a healthy non-meat? (No use for now)
                     print("No non-meat unhealthy substitutes.") # This is a just-in-case
                     finalSent = finalSent.replace("isa", allRelevantPred["isa"])
-                else: # This is not an ingredient that we need to replace for health reasons
-                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
-                if "quantity" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
-                if "measurement" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
-                self.finalIng.append(finalSent)
 
-        elif self.transformationType == "from vegetarian":
-            for ing in self.ingPredicates.keys():
-                allRelevantPred = self.ingPredicates[ing]
-                finalSent = allRelevantPred["sentence"]
+            elif self.transformationType == "from vegetarian":
                 if any([item == "tofu" for item in allRelevantPred["isa"].split(" ")]): # If tofu ever shows up, replace it with a meat protein
                     finalSent = finalSent.replace("isa", "chicken") # Chicken works for pretty much anywhere tofu would show up
                     self.transformedIng[allRelevantPred["isa"]] = "chicken" # Keep track of the transformed ingredients
-                else: # This is not an ingredient that we need to change
-                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
-                if "quantity" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
-                if "measurement" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
-                self.finalIng.append(finalSent)
 
-        elif self.transformationType == "to Mexican":
-            for ing in self.ingPredicates.keys():
-                allRelevantPred = self.ingPredicates[ing]
-                finalSent = allRelevantPred["sentence"]
+            elif self.transformationType == "to Mexican":
                 if any([item in self.styleReplacementGuide["Mexican"] for item in allRelevantPred["isa"].split(" ")]): # If any of these are to be replaced
                     for item in allRelevantPred["isa"].split(" "):
                         if item in self.styleReplacementGuide["Mexican"]: # Because we need the right key (just "cheese", not "grated cheese")
@@ -335,17 +298,16 @@ class Transformer:
                     replacementSpice = self.styleReplacementGuide["Mexican"]["spices"][random.randrange(len(self.styleReplacementGuide["Mexican"]["spices"]))] # Pick a random replacement spice
                     finalSent = finalSent.replace("isa", replacementSpice) # Replace the ingredient with its Mexican equivalent spice
                     self.transformedIng[allRelevantPred["isa"]] = replacementSpice # Keep track of the transformed ingredients
-                else: # This is not an ingredient that we need to change
-                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
-                if "quantity" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
-                if "measurement" in allRelevantPred.keys():
-                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
-                self.finalIng.append(finalSent)
 
-        else: # Just in case
-            print("\nValid option - we just haven't gotten to it yet. Sorry!")
-            sys.exit(0)
+            if allRelevantPred["isa"] not in self.transformedIng.keys(): # If the ingredient was not replaced, then leave it alone
+                finalSent = finalSent.replace("isa", allRelevantPred["isa"])
+            if "quantity" in allRelevantPred.keys():
+                finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
+            if "measurement" in allRelevantPred.keys():
+                finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
+
+            # Now we can collect the finalized instruction
+            self.finalIng.append(finalSent)
 
     ############################################################################
     # Name: _instTransformation                                                #
@@ -357,19 +319,34 @@ class Transformer:
     ############################################################################
     def _instTransformation(self):
         for inst in self.instPredicates.keys():
-            finalInst = self.instPredicates[inst]["sentence"] # This is the sentence that goes through the cascade of transformations
+            finalInst = self.instPredicates[inst]["sentence"] # This is the sentence that goes through the cascade of transformation
 
             # First replace the ingredient if needed
+            # Now to make the code easier and less subtle, there are two loops
+            for oldIng in self.transformedIng:
+                # If an entire phrase is in the original instruction and it is something that needs to be replaced
+                if len(oldIng.split(" ")) > 1 and all([x.lower() in finalInst.lower() for x in oldIng.split(" ")]):
+                    finalInst = finalInst.replace(oldIng, self.transformedIng[oldIng])
+                    finalInst = finalInst.replace(oldIng.lower(), self.transformedIng[oldIng])
+
+            # Now we handle individual words that show up in the original
             for oldIng in self.transformedIng:
                 if oldIng.lower() in finalInst.lower() or any([x.lower() in finalInst.lower() for x in oldIng.split(" ")]):
                     if len(oldIng) > 1: # If the "any" part of the above clause was what caused the condition to trigger
-                        # Then we need to iterate over those values to make sure everything in the old instruction is properly replaced
+                        # Then we need to iterate over those values to make sure any mention of that ingredient gets replaced
                         for ing in oldIng.split(" "): # You may have an uppercase or lowercase version of the ingredient in the sentence
-                            finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
-                            finalInst = finalInst.replace(ing.lower(), self.transformedIng[oldIng])
+                            if ing not in self.transformedIng[oldIng]: # Avoid extra replacing
+                                finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
+                                finalInst = finalInst.replace(ing.lower(), self.transformedIng[oldIng])
                     else:
                         finalInst = finalInst.replace(oldIng, self.transformedIng[oldIng])
                         finalInst = finalInst.replace(oldIng.lower(), self.transformedIng[oldIng])
+
+            # A note on why there are two loops above:
+            # There are cases where if you mention "beef stock", you would get "beef" replaced (as an individual word), and then "stock" replaced.
+            # The appropriate placement is tofu, but the instruction would now become "...tofu tofu..."
+            # Thus, instead of writing potentially subtle and hard to debug code, two loops were written. The first catches "chunks" like
+            # "beef stock", while the second then takes care of stragglers, so to speak.
 
             # Get rid of the word meat if we're transforming to a vegetarian recipe
             if self.transformationType == "to vegetarian" and "meat" in finalInst:
@@ -382,11 +359,8 @@ class Transformer:
             if "toolFor" in self.instPredicates[inst].keys():
                 finalInst = finalInst.replace("toolFor", self.instPredicates[inst]["toolFor"])
 
-            # Time to collect the new instruction
+            # Now we put back together the "cleaned" instruction
             self.finalInst.append(finalInst)
-
-        if (self.transformationType == "to Mexican"): # If we are doing a style transformation, there's a small extra step
-            self._instTransformationForStyle()
 
     ############################################################################
     # Name: _instTransformationForStyle                                        #
