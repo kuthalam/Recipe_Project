@@ -138,16 +138,17 @@ class Transformer:
     ############################################################################
     def _isAFood(self, candidate):
         requestJSON = requests.get("http://api.conceptnet.io/c/en/" + candidate + "?offset=0&limit=" + str(self.queryOffset)).json()
+        finalVerdict = False # Is the ingredient a food or not
         if candidate in self.allFoods: # First check against our set of foods
-            return True
+            finalVerdict = True
         else: # If it's not there, then see if ConceptNet calls it a food
             for edge in requestJSON["edges"]:
                 eachEdge = edge["@id"].split(",")
                 if "isa" in eachEdge[0].lower() and "/" + candidate.lower() + "/" in eachEdge[1].lower() and "/food" in eachEdge[2].lower():
-                    return True
-                if "isa" in eachEdge[0].lower() and "/" + candidate.lower() + "/" in eachEdge[1].lower() and "spice" in eachEdge[2].lower():
+                    finalVerdict = True
+                if "isa" in eachEdge[0].lower() and "/" + candidate.lower() + "/" in eachEdge[1].lower() and "/spice" in eachEdge[2].lower():
                     self.spicesForStyleReplacement.add(candidate)
-        return False
+        return finalVerdict
 
     ############################################################################
     # Name: _instParse                                                         #
@@ -296,7 +297,7 @@ class Transformer:
                     self.transformedIng[allRelevantPred["isa"]] = replaceWith # Keep track of the transformed ingredients
                 elif any([item in self.replacementGuide["healthy"] for item in allRelevantPred["isa"].split(" ")]) and \
                 not any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # Found a healthy non-meat? (No use for now)
-                    print("No non-meat unhealthy substitutes.") # This is just a placeholder for potential future work
+                    print("No non-meat unhealthy substitutes.") # This is a just-in-case
                     finalSent = finalSent.replace("isa", allRelevantPred["isa"])
                 else: # This is not an ingredient that we need to replace for health reasons
                     finalSent = finalSent.replace("isa", allRelevantPred["isa"])
@@ -313,7 +314,7 @@ class Transformer:
                 if any([item == "tofu" for item in allRelevantPred["isa"].split(" ")]): # If tofu ever shows up, replace it with a meat protein
                     finalSent = finalSent.replace("isa", "chicken") # Chicken works for pretty much anywhere tofu would show up
                     self.transformedIng[allRelevantPred["isa"]] = "chicken" # Keep track of the transformed ingredients
-                else: # This is not an ingredient that we need to add meat to
+                else: # This is not an ingredient that we need to change
                     finalSent = finalSent.replace("isa", allRelevantPred["isa"])
                 if "quantity" in allRelevantPred.keys():
                     finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
@@ -334,8 +335,15 @@ class Transformer:
                     replacementSpice = self.styleReplacementGuide["Mexican"]["spices"][random.randrange(len(self.styleReplacementGuide["Mexican"]["spices"]))] # Pick a random replacement spice
                     finalSent = finalSent.replace("isa", replacementSpice) # Replace the ingredient with its Mexican equivalent spice
                     self.transformedIng[allRelevantPred["isa"]] = replacementSpice # Keep track of the transformed ingredients
+                else: # This is not an ingredient that we need to change
+                    finalSent = finalSent.replace("isa", allRelevantPred["isa"])
+                if "quantity" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("quantity", allRelevantPred["quantity"])
+                if "measurement" in allRelevantPred.keys():
+                    finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
+                self.finalIng.append(finalSent)
 
-        else: # Placeholder for now
+        else: # Just in case
             print("\nValid option - we just haven't gotten to it yet. Sorry!")
             sys.exit(0)
 

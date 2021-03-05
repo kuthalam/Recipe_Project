@@ -29,7 +29,8 @@ You can run everything with this command: `python recipeTransformer.py`.
     * From healthy:
         * Basically like the above “to healthy”, but replace the healthy meats with less healthy alternatives
     * To Mexican:
-        * TODO
+        * For this transformation, we switched cheese to queso fresco, sausage to chorizo, and any spices (identified using ConceptNet) with other Mexican spices
+        * In addition, we also added in any Mexican spices that were not involved in a transformation to the ingredient steps.
 
 # Some Notes About Parsing
 * ConceptNet tends to be inconsistent with its information. We would have to parse for very specific keys to try and get information and even then, the information was not guaranteed to be found with that key for every relevant word. You can’t even be sure that the plural of a word or phrase would be in ConceptNet when the singular is there (try sesame seed vs. sesame seeds).
