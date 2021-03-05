@@ -62,8 +62,7 @@ def getIngredients(recipeInfo):
         # Get the ingredient phrase
         startIdx = ingredientString.index("\"") + 1
         stopIdx = ingredientString[startIdx:].index("\"") + startIdx
-        finalIngStr = replaceFractionsWithDecimals(ingredientString[startIdx:stopIdx])
-        ingredientList.append(finalIngStr.strip())
+        ingredientList.append(ingredientString[startIdx:stopIdx].strip())
 
         # Any ingredients left?
         ingredientString = ingredientString[stopIdx + 1:]
@@ -96,7 +95,6 @@ def getInstructions(recipeInfo):
             furtherParsedElem = elem.split(";") # There may be semicolons that separate steps
             for item in furtherParsedElem:
                 if item != "":
-                    item = replaceFractionsWithDecimals(item)
                     instructionsList.append(item.strip().capitalize())
 
         # Any instructions left?
@@ -107,15 +105,6 @@ def getInstructions(recipeInfo):
             instructionsLeft = False
 
     return instructionsList
-
-def replaceFractionsWithDecimals(inputStr):
-    # If there are fractions, we can simplify those down to just decimal numbers for ease of use later
-    allFractions = re.findall("\d\/\d", inputStr)
-    for frac in allFractions:
-        numAndDenom = frac.split("/")
-        inputStr = inputStr.replace(frac, str(float(numAndDenom[0])/float(numAndDenom[1])))
-
-    return inputStr
 
 if __name__ == "__main__":
     request = openSession(sys.argv[1])
