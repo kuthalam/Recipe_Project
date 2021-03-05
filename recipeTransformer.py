@@ -25,9 +25,8 @@ class Transformer:
                     "meatProtein": ["beef", "chicken", "pork", "pepperoni", "sausage", "turkey",
                     "steak", "fish", "salmon", "shrimp", "lobster", "salami", "rennet", "poultry",
                     "bacon", "sirloin", "lamb"],
-                    "meatLiquids": ["stock", "broth"],
-                    "egg": ["veganEgg"], # Special case
-                    "veganEgg": ["egg"], # Special case v2
+                    "pairedWords": ["stock", "broth", "sauce", "loin", "tenderloin"],
+                    "worcestershire sauce": ["soy sauce"],
                     "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
                     "healthy": ["chicken", "turkey", "coconut oil", "poultry", "fish"], # This list was constructed by referring to https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/nutrition-basics/meat-poultry-and-fish-picking-healthy-proteins
                     "unhealthy": ["steak", "beef", "sausage", "butter", "ham", "salami", "bacon", "sirloin"],
@@ -36,6 +35,10 @@ class Transformer:
                     "plants": ["onions", "onion"]}
     allFoods = set()
     cookingVerbs = ["place"] # ConceptNet can be very bad at detecting what things are verbs
+
+    spicesForStyleReplacement = set()
+    styleReplacementGuide = {"Mexican": {"sausage": "chorizo", "cheese": "queso fresco",
+    "spices": ["Chili Powder", "Cilantro", "Coriander", "Cumin", "Garlic Powder", "Onion Powder", "Smoked Paprika"]}}
 
     transformationType = None
     queryOffset = 100 # Number of results returned by ConceptNet API call
@@ -95,10 +98,11 @@ class Transformer:
                     if mainToken is None:
                         mainToken = token.text
 
-                    # If you get beef sirloin or a kind of stock or broth,
-                    # replace both words, not just "sirloin" or "broth"
-                    if "sirloin" in mainToken or mainToken in self.replacementGuide["meatLiquids"]:
-                        mainToken = list(parsedText)[list(parsedText).index(token) - 1].text + " " + token.text
+                    # If you get beef sirloin, pork loin/tenderloin, or a kind of stock or broth,
+                    # replace both words (e.g. chicken broth), not just "sirloin" or "broth"
+                    if "sirloin" in mainToken or mainToken in self.replacementGuide["pairedWords"]:
+                        parsedTextAsList = list(parsedText)
+                        mainToken = parsedTextAsList[parsedTextAsList.index(token) - 1].text + " " + token.text
 
                     # Now assign values based on the ingredient name
                     dictKey = mainToken + " " + str(i) # This is the key with which all info for this ingredient can be retrieved
@@ -111,7 +115,6 @@ class Transformer:
                         for edge in requestObj["edges"]: # Check if there are two word phrases like ground beef, so we can make a note of the entire phrase
                             eachEdge = edge["@id"].split(",") # Look for child.text + " " + token.text isa food
                             if "isa" in eachEdge[0].lower() and "/" + child.text.lower() + "_" + mainToken.lower() + "/" in eachEdge[1].lower() and "food" in eachEdge[2].lower():
-                                ing = ing.replace("isa", mainToken) # Get back the original sentence
                                 self.ingPredicates[dictKey]["isa"] = child.text + " " + mainToken
                                 ing = ing.replace(child.text + " " + mainToken, "isa")
                         if any([x.text.isdigit() for x in child.children]): # The measurement and amount, tied together by the parser
@@ -130,7 +133,8 @@ class Transformer:
     # Returns: Boolean                                                         #
     # Notes: Leverage ConceptNet to see if candidate is a food. Since          #
     # ConceptNet is not particularly reliable, we also made use of our         #
-    # allFoods set (which was built in __init__).                              #
+    # allFoods set (which was built in __init__). We also collect spices for   #
+    # the transformation to another cuisine.                                   #
     ############################################################################
     def _isAFood(self, candidate):
         requestJSON = requests.get("http://api.conceptnet.io/c/en/" + candidate + "?offset=0&limit=" + str(self.queryOffset)).json()
@@ -139,8 +143,10 @@ class Transformer:
         else: # If it's not there, then see if ConceptNet calls it a food
             for edge in requestJSON["edges"]:
                 eachEdge = edge["@id"].split(",")
-                if "isa" in eachEdge[0].lower() and "/" + candidate.lower() + "/" in eachEdge[1].lower() and "food" in eachEdge[2].lower():
+                if "isa" in eachEdge[0].lower() and "/" + candidate.lower() + "/" in eachEdge[1].lower() and "/food" in eachEdge[2].lower():
                     return True
+                if "isa" in eachEdge[0].lower() and "/" + candidate.lower() + "/" in eachEdge[1].lower() and "spice" in eachEdge[2].lower():
+                    self.spicesForStyleReplacement.add(candidate)
         return False
 
     ############################################################################
@@ -216,7 +222,7 @@ class Transformer:
         self.transformationType = input("""What would you like us to transform the given dish into?\n\nPlease enter one of the options below:
         - \"to vegetarian\" or \"from vegetarian\"
         - \"to healthy\" or \"from healthy\"
-        - \"to <insert cuisine here>\"\nEnter choice here: """)
+        - \"to Mexican\"\nEnter choice here: """)
 
         allTypes = ["to vegetarian", "to healthy", "from vegetarian", "from healthy", "to Mexican"]
 
@@ -241,9 +247,13 @@ class Transformer:
                 if any([x in self.replacementGuide["meatProtein"] for x in allRelevantPred["isa"].split(" ")]): # If you found a meat protein
                     finalSent = finalSent.replace("isa", self.replacementGuide["vegProtein"][0]) # Then tofu is pretty much the go-to replacement
                     self.transformedIng[allRelevantPred["isa"]] = self.replacementGuide["vegProtein"][0] # Keep track of the transformed ingredients
-                elif any([x in self.replacementGuide["meatLiquids"] for x in allRelevantPred["isa"].split(" ")]): # Quick substitution for the liquids
-                    finalSent = finalSent.replace("isa", "vegetable broth") # Then vegetable broth is pretty much the go-to replacement (reference: https://www.myfrugalhome.com/broth-substitutes/)
-                    self.transformedIng[allRelevantPred["isa"]] = "vegetable broth" # Keep track of the transformed ingredients
+                elif any([x in self.replacementGuide["pairedWords"] for x in allRelevantPred["isa"].split(" ")]): # Quick substitution for the liquids
+                    if not "sauce" in allRelevantPred["isa"]: # Sauce is a bit of a special case
+                        finalSent = finalSent.replace("isa", "vegetable broth") # Then vegetable broth is pretty much the go-to replacement (reference: https://www.myfrugalhome.com/broth-substitutes/)
+                        self.transformedIng[allRelevantPred["isa"]] = "vegetable broth" # Keep track of the transformed ingredients
+                    else:
+                        finalSent = finalSent.replace("isa", "soy sauce") # Soy sauce seems reasonable (reference: https://food52.com/blog/24403-best-worcestershire-sauce-substitutes)
+                        self.transformedIng[allRelevantPred["isa"]] = "soy sauce" # Keep track of the transformed ingredients
                 else: # If the ingredient's not a meat protein, there's nothing to replace
                     finalSent = finalSent.replace("isa", allRelevantPred["isa"])
                 if "quantity" in allRelevantPred.keys():
@@ -311,6 +321,20 @@ class Transformer:
                     finalSent = finalSent.replace("measurement", allRelevantPred["measurement"])
                 self.finalIng.append(finalSent)
 
+        elif self.transformationType == "to Mexican":
+            for ing in self.ingPredicates.keys():
+                allRelevantPred = self.ingPredicates[ing]
+                finalSent = allRelevantPred["sentence"]
+                if any([item in self.styleReplacementGuide["Mexican"] for item in allRelevantPred["isa"].split(" ")]): # If any of these are to be replaced
+                    for item in allRelevantPred["isa"].split(" "):
+                        if item in self.styleReplacementGuide["Mexican"]: # Because we need the right key (just "cheese", not "grated cheese")
+                            finalSent = finalSent.replace("isa", self.styleReplacementGuide["Mexican"][item]) # Replace the ingredient with its Mexican equivalent
+                            self.transformedIng[allRelevantPred["isa"]] = self.styleReplacementGuide["Mexican"][item] # Keep track of the transformed ingredients
+                elif any([item in self.spicesForStyleReplacement for item in allRelevantPred["isa"].split(" ")]): # If any of these are a spice to be replaced
+                    replacementSpice = self.styleReplacementGuide["Mexican"]["spices"][random.randrange(len(self.styleReplacementGuide["Mexican"]["spices"]))] # Pick a random replacement spice
+                    finalSent = finalSent.replace("isa", replacementSpice) # Replace the ingredient with its Mexican equivalent spice
+                    self.transformedIng[allRelevantPred["isa"]] = replacementSpice # Keep track of the transformed ingredients
+
         else: # Placeholder for now
             print("\nValid option - we just haven't gotten to it yet. Sorry!")
             sys.exit(0)
@@ -329,13 +353,15 @@ class Transformer:
 
             # First replace the ingredient if needed
             for oldIng in self.transformedIng:
-                if oldIng in finalInst or any([x in finalInst for x in oldIng.split(" ")]):
+                if oldIng.lower() in finalInst.lower() or any([x.lower() in finalInst.lower() for x in oldIng.split(" ")]):
                     if len(oldIng) > 1: # If the "any" part of the above clause was what caused the condition to trigger
                         # Then we need to iterate over those values to make sure everything in the old instruction is properly replaced
-                        for ing in oldIng.split(" "):
+                        for ing in oldIng.split(" "): # You may have an uppercase or lowercase version of the ingredient in the sentence
                             finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
+                            finalInst = finalInst.replace(ing.lower(), self.transformedIng[oldIng])
                     else:
-                        finalInst = finalInst.replace(ing, self.transformedIng[oldIng])
+                        finalInst = finalInst.replace(oldIng, self.transformedIng[oldIng])
+                        finalInst = finalInst.replace(oldIng.lower(), self.transformedIng[oldIng])
 
             # Get rid of the word meat if we're transforming to a vegetarian recipe
             if self.transformationType == "to vegetarian" and "meat" in finalInst:
@@ -350,6 +376,30 @@ class Transformer:
 
             # Time to collect the new instruction
             self.finalInst.append(finalInst)
+
+        if (self.transformationType == "to Mexican"): # If we are doing a style transformation, there's a small extra step
+            self._instTransformationForStyle()
+
+    ############################################################################
+    # Name: _instTransformationForStyle                                        #
+    # Params: None                                                             #
+    # Returns: None                                                            #
+    # Notes: Check if any of the style transformation spices ended up not      #
+    # getting mentioned in the ingredients. If they did, do nothing, else      #
+    # add an extra step to toss those in.                                      #
+    ############################################################################
+    def _instTransformationForStyle(self):
+        for spice in self.styleReplacementGuide["Mexican"]["spices"]:
+            alreadyAdded = False
+
+            # Check if the spice was already substituted in
+            for inst in self.finalInst:
+                if spice.lower() in inst.lower():
+                    alreadyAdded = True
+
+            # If not, toss it in there
+            if not alreadyAdded:
+                self.finalInst.append("Toss in some " + spice + " also")
 
     ############################################################################
     # Name: _printNewIngredients                                               #
