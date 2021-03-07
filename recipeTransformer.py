@@ -227,7 +227,7 @@ class Transformer:
         allTypes = ["to vegetarian", "to healthy", "from vegetarian", "from healthy", "to Mexican"]
 
         while not self.transformationType in allTypes:
-            self.transformationType = input("\nI'm sorry, it looks like that was not a valid transformation. Could you please review the list of transformations and input again? We do need you to input the exact phrases above: ")
+            self.transformationType = input("\nI'm sorry, it looks like that was not a valid transformation. Could you please review the list of transformations and input again? We do need you to input the exact phrases above: ").lower()
         print("\nSo we are going to be transforming " + self.recipeData["recipeName"] + " in accordance with the \"" + self.transformationType + "\" option.")
 
     ############################################################################
