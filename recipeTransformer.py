@@ -7,7 +7,6 @@ import re
 import nltk
 import requests
 import random
-import string
 
 class Transformer:
     recipeData = None
@@ -25,8 +24,8 @@ class Transformer:
     replacementGuide = {"vegProtein": ["tofu"],
                     "meatProtein": ["beef", "chicken", "pork", "pepperoni", "sausage", "turkey",
                     "steak", "fish", "salmon", "shrimp", "lobster", "salami", "rennet", "poultry",
-                    "bacon", "sirloin", "lamb"],
-                    "pairedWords": ["stock", "broth", "sauce", "loin", "tenderloin"],
+                    "bacon", "lamb"],
+                    "pairedWords": ["stock", "broth", "sauce", "loin", "tenderloin", "sirloin", "breast"],
                     "worcestershire sauce": ["soy sauce"],
                     "standardDairy": ["milk", "cheese", "cream", "yogurt", "butter", "ghee"],
                     "healthy": ["chicken", "turkey", "coconut oil", "poultry", "fish"], # This list was constructed by referring to https://www.heart.org/en/healthy-living/healthy-eating/eat-smart/nutrition-basics/meat-poultry-and-fish-picking-healthy-proteins
@@ -101,9 +100,8 @@ class Transformer:
 
                     # If you get beef sirloin, pork loin/tenderloin, or a kind of stock or broth,
                     # replace both words (e.g. chicken broth), not just "sirloin" or "broth"
-                    if "sirloin" in mainToken or mainToken in self.replacementGuide["pairedWords"]:
-                        parsedTextAsList = list(parsedText)
-                        mainToken = parsedTextAsList[parsedTextAsList.index(token) - 1].text + " " + token.text
+                    if mainToken in self.replacementGuide["pairedWords"]:
+                        mainToken = ing[ing.index(token) - 1] + " " + token.text
 
                     # Now assign values based on the ingredient name
                     dictKey = mainToken + " " + str(i) # This is the key with which all info for this ingredient can be retrieved
@@ -224,12 +222,12 @@ class Transformer:
         self.transformationType = input("""What would you like us to transform the given dish into?\n\nPlease enter one of the options below:
         - \"to vegetarian\" or \"from vegetarian\"
         - \"to healthy\" or \"from healthy\"
-        - \"to Mexican\"\nEnter choice here: """)
+        - \"to Mexican\"\nEnter choice here: """).lower()
 
         allTypes = ["to vegetarian", "to healthy", "from vegetarian", "from healthy", "to Mexican"]
 
         while not self.transformationType in allTypes:
-            print("\nI'm sorry, it looks like that was not a valid transformation. Could you please review the list of transformations and input again? We do need you to input the exact phrases above: ")
+            self.transformationType = input("\nI'm sorry, it looks like that was not a valid transformation. Could you please review the list of transformations and input again? We do need you to input the exact phrases above: ")
         print("\nSo we are going to be transforming " + self.recipeData["recipeName"] + " in accordance with the \"" + self.transformationType + "\" option.")
 
     ############################################################################
