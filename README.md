@@ -4,6 +4,7 @@ Please follow the two installation steps below:
 * First run `pip install -r requirements.txt`
 * Then an additional command is needed to get the dependency parser working: `python3 -m spacy download en_core_web_sm`
     * For some reason, `pip freeze` was not enough to get the `requirements.txt` file to take care of this.
+* If you are still having issues, you may need to `pip install spacy` and `pip install requests-html` separately.
 
 You can run everything with this command: `python recipeTransformer.py`.
 * Example command: `python recipeTransformer.py`

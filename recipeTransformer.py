@@ -67,7 +67,7 @@ class Transformer:
     # the relevant portions (ingredient name, quantity, and measurement units) #
     # from the recipe data and saves these in the self.ingPredicates dict.     #
     # By predicate, we mean something like "(isa beef ingredient)", but to be  #
-    # Pythonic (or we think we're being Pythonic), this is in a dict structure #
+    # Pythonic, this is in a dict structure                                    #
     # (ex. self.ingPredicates["beef"]["isa"] = "beef").                        #
     # The parsing combines using a dependency parser and conceptNet to narrow  #
     # the "isa" predicate to point to a food. Oddly enough, whether the root   #
