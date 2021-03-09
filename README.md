@@ -1,14 +1,11 @@
 # Recipe_Project
 
 Please follow the two installation steps below:
-* First run `pip install -r requirements.txt`
+* First run `conda env create --name myenv2 -f environment.yml`
 * Then an additional command is needed to get the dependency parser working: `python3 -m spacy download en_core_web_sm`
-    * For some reason, `pip freeze` was not enough to get the `requirements.txt` file to take care of this.
-* If you are still having issues, you may need to `pip install spacy` and `pip install requests-html` separately.
+    * For some reason, `pip freeze` was not enough to get the `environment.yml` file to take care of this.
 
-You can run everything with this command: `python recipeTransformer.py`.
-* Example command: `python recipeTransformer.py`
-* The CLI should hopefully be able to guide the user from there.
+You can run everything with this command: `python recipeTransformer.py`. The CLI should hopefully be able to guide the user from there.
 
 # General Overview of Transformation Ideas/Methods
 * Our parsing does the required transformations: to vegetarian, from vegetarian, to healthy, from healthy, and to Mexican.

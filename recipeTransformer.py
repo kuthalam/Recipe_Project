@@ -224,7 +224,7 @@ class Transformer:
         - \"to healthy\" or \"from healthy\"
         - \"to Mexican\"\nEnter choice here: """).lower()
 
-        allTypes = ["to vegetarian", "to healthy", "from vegetarian", "from healthy", "to Mexican"]
+        allTypes = ["to vegetarian", "to healthy", "from vegetarian", "from healthy", "to mexican"]
 
         while not self.transformationType in allTypes:
             self.transformationType = input("\nI'm sorry, it looks like that was not a valid transformation. Could you please review the list of transformations and input again? We do need you to input the exact phrases above: ").lower()
@@ -360,6 +360,10 @@ class Transformer:
             # Now we put back together the "cleaned" instruction
             self.finalInst.append(finalInst)
 
+        # If we are doing a style transformation, there's a small extra step
+        if (self.transformationType == "to mexican"):
+            self._instTransformationForStyle()
+
     ############################################################################
     # Name: _instTransformationForStyle                                        #
     # Params: None                                                             #
@@ -379,7 +383,8 @@ class Transformer:
 
             # If not, toss it in there
             if not alreadyAdded:
-                self.finalInst.append("Toss in some " + spice + " also")
+                self.finalIng.append(spice.capitalize()) # So only the first word is capitalized
+                self.finalInst.append("Toss in some " + spice.lower() + " also")
 
     ############################################################################
     # Name: _printNewIngredients                                               #
